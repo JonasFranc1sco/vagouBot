@@ -1,0 +1,18 @@
+linkedin:
+  keywords:
+    - "golang"
+    - "backend go"
+  location: "brazil"
+  max_results: 100
+
+proxy:
+  enabled: false
+  urls: []
+
+rate_limit:
+  requests_per_second: 0.5
+  burst: 1
+
+telegram:
+  bot_token: ""
+  chat_id: 0
