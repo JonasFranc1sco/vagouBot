@@ -1,24 +1,31 @@
 package linkedin
 
 import (
+	"compress/gzip"
+	"context"
+	"io"
 	"net/http"
 	"net/http/cookiejar"
+	"strings"
 	"time"
 
+	"github.com/JonasFranc1sco/vagouBot/internal/proxy"
+	ratelimit "github.com/JonasFranc1sco/vagouBot/internal/rate"
 	"github.com/hashicorp/go-retryablehttp"
 )
 
 // Client encapsula o HTTP client com configuração específica
 // para scraping no LinkedIn.
 type Client struct {
-	HTTP *http.Client
+	HTTP    *http.Client
+	Limiter *ratelimit.Limiter
 }
 
 // NewClient cria um HTTP client com:
 // Retry automático com backoff
 // Cookie jar para manter cookies entre requests
 // Headers que simulam um browser real
-func NewClient() *Client {
+func NewClient(proxyURLs []string, proxyEnabled bool, rps float64, burst int) *Client {
 	// Cookie jar armazena cookies que o LinkedIn envia.
 	jar, _ := cookiejar.New(nil)
 
@@ -43,9 +50,20 @@ func NewClient() *Client {
 		TLSHandshakeTimeout:   10 * time.Second,
 		ResponseHeaderTimeout: 10 * time.Second,
 	}
+
+	if proxyEnabled && len(proxyURLs) > 0 {
+		rotator := proxy.New(proxyURLs)
+		rotator.ConfigureTransport(transport)
+	}
+
 	sc.Transport = transport
 
-	return &Client{HTTP: sc}
+	limiter := ratelimit.New(rps, burst)
+
+	return &Client{
+		HTTP:    sc,
+		Limiter: limiter,
+	}
 }
 
 // linkedHeaders retorna headers que um browser real enviaria.
@@ -70,6 +88,10 @@ func linkedinHeaders() map[string]string {
 
 // DoRequest executa um GET com os headers do LinkedIn
 func (c *Client) DoRequest(url string) (*http.Response, error) {
+	if err := c.Limiter.Wait(context.Background()); err != nil {
+		return nil, err
+	}
+
 	req, err := http.NewRequest("GET", url, nil)
 	if err != nil {
 		return nil, err
@@ -81,5 +103,25 @@ func (c *Client) DoRequest(url string) (*http.Response, error) {
 	}
 
 	// retryablehttp retry
-	return c.HTTP.Do(req)
+	resp, err := c.HTTP.Do(req)
+	if err != nil {
+		return nil, err
+	}
+
+	// Descomprime gzip se necessário
+	if strings.Contains(resp.Header.Get("Content-Encoding"), "gzip") {
+		rawBody, err := io.ReadAll(resp.Body)
+		resp.Body.Close()
+		if err != nil {
+			return nil, err
+		}
+		gz, err := gzip.NewReader(strings.NewReader(string(rawBody)))
+		if err != nil {
+			return nil, err
+		}
+
+		resp.Body = gz
+	}
+
+	return resp, nil
 }

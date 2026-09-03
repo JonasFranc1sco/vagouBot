@@ -12,6 +12,9 @@ type Job struct {
 	PostedDate     string
 	Description    string
 	SeniorityLevel string
+	EmploymentType string
+	JobFunction    string
+	Industries     string
 	ScrapedAt      time.Time
 }
 

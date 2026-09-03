@@ -91,10 +91,81 @@ func extractJobID(url string) string {
 		url = url[:idx]
 	}
 
-	parts := strings.Split(strings.TrimRight(url, "/"), "/")
+	url = strings.TrimRight(url, "/")
+	parts := strings.Split(url, "/")
 	if len(parts) == 0 {
 		return ""
 	}
 
-	return parts[len(parts)-1]
+	lastSegment := parts[len(parts)-1]
+
+	slugParts := strings.Split(lastSegment, "-")
+	if len(slugParts) == 0 {
+		return ""
+	}
+
+	return slugParts[len(slugParts)-1]
+}
+
+// FetchDetail busca os detalhes completos de uma vaga
+func (c *Client) FetchDetail(job *Job) error {
+	if job.ID == "" {
+		return fmt.Errorf("ID vazio, impossível buscar detalhe")
+	}
+
+	// ID pode conter query params, precisa ser limpado
+	detailID := job.ID
+	if idx := strings.Index(detailID, "?"); idx != -1 {
+		detailID = detailID[:idx]
+	}
+
+	detailURL := fmt.Sprintf("http://www.linkedin.com/jobs-guest/jobs/api/jobPosting/%s", detailID)
+
+	fmt.Printf("URL detalhe: %s\n", detailID)
+
+	resp, err := c.DoRequest(detailURL)
+	if err != nil {
+		return fmt.Errorf("Erro ao buscar detalhe: %w", err)
+	}
+	defer resp.Body.Close()
+
+	fmt.Printf("Status detalhe: %d\n", resp.StatusCode)
+
+	if resp.StatusCode != 200 {
+		return fmt.Errorf("status %d no detalhe", resp.StatusCode)
+	}
+
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return fmt.Errorf("erro ao ler detalhe: %w", err)
+	}
+
+	fmt.Printf("Tamanho HTML detalhe: %d bytes\n", len(body))
+
+	doc, err := goquery.NewDocumentFromReader(strings.NewReader(string(body)))
+	if err != nil {
+		return fmt.Errorf("erro ao parsear detalhe: %w", err)
+	}
+
+	// Descrição completa
+	job.Description = strings.TrimSpace(doc.Find(".description__text--rich").Text())
+
+	// Critérios
+	doc.Find(".description__job-criteria-item").Each(func(i int, s *goquery.Selection) {
+		criteria := strings.TrimSpace(s.Find(".description__job-criteria-subheader").Text())
+		value := strings.TrimSpace(s.Find(".description__job-criteria-text").Text())
+
+		switch strings.ToLower(criteria) {
+		case "seniority level":
+			job.SeniorityLevel = value
+		case "employment type":
+			job.EmploymentType = value
+		case "job function":
+			job.JobFunction = value
+		case "industries":
+			job.Industries = value
+		}
+	})
+
+	return nil
 }
