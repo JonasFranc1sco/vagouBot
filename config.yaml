@@ -13,6 +13,18 @@ rate_limit:
   requests_per_second: 0.5
   burst: 1
 
+filters:
+  include_keywords:
+    - "golang"
+    - "go backend"
+  exclude_keywords:
+    - "senior"
+    - "pleno"
+  exclude_companies: []
+  include_companies: []
+  include_locations: []
+  exclude_locations: []
+  min_description_lengh: 10000
 telegram:
   bot_token: ""
   chat_id: 0

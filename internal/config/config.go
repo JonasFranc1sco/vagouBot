@@ -13,6 +13,17 @@ type Config struct {
 	Proxy     ProxyConfig     `yaml:"proxy"`
 	Telegram  TelegramConfig  `yaml:"telegram"`
 	RateLimit RateLimitConfig `yaml:"rate_limit"`
+	Filters   FiltersConfig   `yaml:"filters"`
+}
+
+type FiltersConfig struct {
+	IncludeKeywords      []string `yaml:"include_keywords"`
+	ExcludeKeywords      []string `yaml:"exclude_keywords"`
+	IncludeCompanies     []string `yaml:"include_companies"`
+	ExcludeCompanies     []string `yaml:"exclude_companies"`
+	IncludeLocations     []string `yaml:"include_locations"`
+	ExcludeLocations     []string `yaml:"exclude_locations"`
+	MinDescriptionLength int      `yaml:"min_description_length"`
 }
 
 type LinkedInConfig struct {

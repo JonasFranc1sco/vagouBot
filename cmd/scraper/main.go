@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/JonasFranc1sco/vagouBot/internal/config"
+	"github.com/JonasFranc1sco/vagouBot/internal/filter"
 	"github.com/JonasFranc1sco/vagouBot/internal/linkedin"
 )
 
@@ -26,6 +27,8 @@ func main() {
 		cfg.RateLimit.RequestsPerSecond,
 		cfg.RateLimit.Burst,
 	)
+
+	dedup := filter.NewDedup("seen.json")
 
 	// Monta URL de busca
 	searchURL := fmt.Sprintf("https://www.linkedin.com/jobs-guest/jobs/api/seeMoreJobPostings/search?keywords=%s&location=%s&start=0",
@@ -50,6 +53,9 @@ func main() {
 		log.Fatalf("Erro ao parsear vagas: %v", err)
 	}
 
+	jobs = dedup.FilterNew(jobs)
+	fmt.Printf("Após dedup: %d vagas novas\n", len(jobs))
+
 	for i := range jobs {
 		if jobs[i].ID == "" {
 			continue
@@ -70,6 +76,19 @@ func main() {
 		fmt.Printf("OK = %d caracteres de descrição\n", len(jobs[i].Description))
 	}
 
+	filterCfg := filter.Config{
+		IncludeKeywords:      cfg.Filters.IncludeKeywords,
+		ExcludeKeywords:      cfg.Filters.ExcludeKeywords,
+		IncludeCompanies:     cfg.Filters.IncludeCompanies,
+		ExcludeCompanies:     cfg.Filters.ExcludeCompanies,
+		IncludeLocations:     cfg.Filters.IncludeLocations,
+		ExcludeLocations:     cfg.Filters.ExcludeLocations,
+		MinDescriptionLength: cfg.Filters.MinDescriptionLength,
+	}
+
+	filtered := filter.FilterProcess(jobs, filterCfg)
+	fmt.Printf("\n Após filtros: %d vagas relevantes\n", len(filtered))
+
 	for i, job := range jobs {
 		if i >= 3 {
 			break
@@ -89,8 +108,9 @@ func main() {
 			fmt.Printf("%s\n", desc)
 		}
 		fmt.Println("---")
-
 	}
+
+	dedup.MarkAll(filtered)
 }
 
 // min retorna o menor de dois inteiros
