@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"fmt"
 	"io"
 	"log"
@@ -11,6 +12,7 @@ import (
 	"github.com/JonasFranc1sco/vagouBot/internal/config"
 	"github.com/JonasFranc1sco/vagouBot/internal/filter"
 	"github.com/JonasFranc1sco/vagouBot/internal/linkedin"
+	"github.com/JonasFranc1sco/vagouBot/internal/telegram"
 )
 
 func main() {
@@ -29,6 +31,10 @@ func main() {
 	)
 
 	dedup := filter.NewDedup("seen.json")
+
+	// Telegram
+	tg := telegram.NewClient(cfg.Telegram.BotToken, cfg.Telegram.ChatID)
+	ctx := context.Background()
 
 	// Monta URL de busca
 	searchURL := fmt.Sprintf("https://www.linkedin.com/jobs-guest/jobs/api/seeMoreJobPostings/search?keywords=%s&location=%s&start=0",
@@ -88,6 +94,15 @@ func main() {
 
 	filtered := filter.FilterProcess(jobs, filterCfg)
 	fmt.Printf("\n Após filtros: %d vagas relevantes\n", len(filtered))
+
+	if cfg.Telegram.BotToken != "" && cfg.Telegram.ChatID != 0 {
+		if len(filtered) == 0 {
+			tg.SendText(ctx, "Nenhuma vaga nova hoje.")
+		} else {
+			tg.SendText(ctx, fmt.Sprintf("Encontradas %d vagas novas:", len(filtered)))
+			tg.SendJobs(ctx, filtered)
+		}
+	}
 
 	for i, job := range jobs {
 		if i >= 3 {

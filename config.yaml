@@ -26,5 +26,5 @@ filters:
   exclude_locations: []
   min_description_lengh: 10000
 telegram:
-  bot_token: ""
-  chat_id: 0
+  bot_token: // "SEU BOT TOKEN AQUI ENTRE ASPAS"
+  chat_id: // SEU CHAT ID AQUI
