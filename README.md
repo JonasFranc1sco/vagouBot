@@ -1,4 +1,4 @@
-# VagouBot (golanglinkedin)
+# VagouBot
 
 Scraper de vagas do LinkedIn que busca postings com base em palavras-chave,
 aplica filtros de relevância e envia as vagas encontradas para um bot do Telegram.
