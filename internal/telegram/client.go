@@ -80,10 +80,6 @@ func (c *Client) sendMessage(ctx context.Context, text string, parseMode string)
 	return nil
 }
 
-func (c *Client) SendJob(ctx context.Context, job interface{ FormatJob() string }) error {
-	return c.sendMessage(ctx, job.FormatJob(), ParseModeHTML)
-}
-
 func (c *Client) SendText(ctx context.Context, text string) error {
 	return c.sendMessage(ctx, text, "")
 }
@@ -93,18 +89,14 @@ func (c *Client) SendHTML(ctx context.Context, text string) error {
 }
 
 func (c *Client) SendJobs(ctx context.Context, jobs []linkedin.Job) error {
-	messages, err := BuildJobsMessage(jobs, 0)
-	if err != nil {
-		return err
-	}
+	for _, job := range jobs {
+		msg := FormatJobNotification(job)
 
-	for _, msg := range messages {
 		if err := c.SendHTML(ctx, msg); err != nil {
 			return err
 		}
 
 		time.Sleep(1 * time.Second)
 	}
-
 	return nil
 }

@@ -1,0 +1,12 @@
+services:
+  vagoubot:
+    build: .
+    container_name: vagoubot
+    restart: unless-stopped
+    environment:
+      - DATA_DIR=/app/data
+      - TZ=America/Sao_Paulo
+      - TELEGRAM_BOT_TOKEN=${TELEGRAM_BOT_TOKEN:-}
+      - TELEGRAM_CHAT_ID=${TELEGRAM_CHAT_ID:-0}
+    volumes:
+    - ./data:/app/data

@@ -87,17 +87,26 @@ func shouldKeep(job linkedin.Job, cfg Config) bool {
 	}
 
 	for _, pattern := range cfg.IncludeKeywords {
+		if pattern == "" {
+			continue
+		}
+
 		if isRegex(pattern) {
-			re, err := regexp.Compile("(?i)" + pattern)
+			re, err := regexp.Compile("(?i)" + strings.Trim(pattern, "/"))
 			if err != nil {
 				continue
 			}
 			if !re.MatchString(combined) {
 				return false
 			}
+			continue
+		}
+		if !strings.Contains(combined, strings.ToLower(pattern)) {
+			return false
 		}
 	}
 	return true
+
 }
 
 // isRegex verifica se uma string parece ser um padrão regex.

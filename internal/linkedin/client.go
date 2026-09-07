@@ -87,16 +87,15 @@ func linkedinHeaders() map[string]string {
 }
 
 // DoRequest executa um GET com os headers do LinkedIn
-func (c *Client) DoRequest(url string) (*http.Response, error) {
-	if err := c.Limiter.Wait(context.Background()); err != nil {
+func (c *Client) DoRequest(ctx context.Context, url string) (*http.Response, error) {
+	if err := c.Limiter.Wait(ctx); err != nil {
 		return nil, err
 	}
 
-	req, err := http.NewRequest("GET", url, nil)
+	req, err := http.NewRequestWithContext(ctx, "GET", url, nil)
 	if err != nil {
 		return nil, err
 	}
-
 	// Aplica todos os headers de browser
 	for key, value := range linkedinHeaders() {
 		req.Header.Set(key, value)

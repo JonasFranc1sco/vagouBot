@@ -1,6 +1,7 @@
 package linkedin
 
 import (
+	"context"
 	"fmt"
 	"io"
 	"strings"
@@ -108,7 +109,7 @@ func extractJobID(url string) string {
 }
 
 // FetchDetail busca os detalhes completos de uma vaga
-func (c *Client) FetchDetail(job *Job) error {
+func (c *Client) FetchDetail(ctx context.Context, job *Job) error {
 	if job.ID == "" {
 		return fmt.Errorf("ID vazio, impossível buscar detalhe")
 	}
@@ -123,13 +124,11 @@ func (c *Client) FetchDetail(job *Job) error {
 
 	fmt.Printf("URL detalhe: %s\n", detailID)
 
-	resp, err := c.DoRequest(detailURL)
+	resp, err := c.DoRequest(ctx, detailURL)
 	if err != nil {
 		return fmt.Errorf("Erro ao buscar detalhe: %w", err)
 	}
 	defer resp.Body.Close()
-
-	fmt.Printf("Status detalhe: %d\n", resp.StatusCode)
 
 	if resp.StatusCode != 200 {
 		return fmt.Errorf("status %d no detalhe", resp.StatusCode)
@@ -139,8 +138,6 @@ func (c *Client) FetchDetail(job *Job) error {
 	if err != nil {
 		return fmt.Errorf("erro ao ler detalhe: %w", err)
 	}
-
-	fmt.Printf("Tamanho HTML detalhe: %d bytes\n", len(body))
 
 	doc, err := goquery.NewDocumentFromReader(strings.NewReader(string(body)))
 	if err != nil {

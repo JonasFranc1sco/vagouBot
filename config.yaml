@@ -3,7 +3,7 @@ linkedin:
     - "python"
     - "junior"
   location: "remote"
-  max_results: 100
+  max_results: 20
 
 proxy:
   enabled: false
@@ -15,16 +15,12 @@ rate_limit:
 
 filters:
   include_keywords:
-    - "golang"
-    - "go backend"
   exclude_keywords:
-    - "senior"
-    - "pleno"
   exclude_companies: []
   include_companies: []
   include_locations: []
   exclude_locations: []
   min_description_lengh: 10000
 telegram:
-  bot_token: // "SEU BOT TOKEN AQUI ENTRE ASPAS"
-  chat_id: // SEU CHAT ID AQUI
+  bot_token: ""
+  chat_id: 0
