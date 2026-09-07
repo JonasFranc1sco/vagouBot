@@ -23,13 +23,13 @@ aplica filtros de relevância e envia as vagas encontradas para um bot do Telegr
    go mod tidy
    ```
 
-3. **(Opcional, mas recomendado) Configure o bot do Telegram e o chat**
+3. **(Opcional para usar telegram, mas recomendado) Configure o bot do Telegram e o chat**
 
-   Edite o arquivo `config.yaml` na raiz do projeto com:
+   Crie/Edite o arquivo `.env` na raiz do projeto com:
 
    ```yaml
-   CHAT_ID = SEU_CHAT_ID
-   BOT_TOKEN = "SEU_BOT_TOKEN"
+   TELEGRAM_CHAT_ID = SEU_CHAT_ID
+   TELEGRAM_BOT_TOKEN = "SEU_BOT_TOKEN"
    ```
 
 4. **Ajuste a busca e os filtros em `config.yaml`**
