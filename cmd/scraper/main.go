@@ -28,13 +28,13 @@ func main() {
 	defer stop()
 
 	for {
+		if err := run(ctx, logger); err != nil {
+			logger.Error("erro na execução", "err", err)
+		}
+
 		if err := waitUntil(ctx, logger, nextDailyRun(18, 0)); err != nil {
 			logger.Info("encerrado durante a espera (kill switch)")
 			return
-		}
-
-		if err := run(ctx, logger); err != nil {
-			logger.Error("erro na execução", "err", err)
 		}
 	}
 }
