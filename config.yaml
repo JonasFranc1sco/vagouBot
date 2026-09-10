@@ -3,7 +3,8 @@ linkedin:
     - "python"
     - "junior"
   location: "remote"
-  max_results: 20
+  max_results: 10
+  post_time: "week"
 
 proxy:
   enabled: false
@@ -20,7 +21,59 @@ filters:
   include_companies: []
   include_locations: []
   exclude_locations: []
-  min_description_lengh: 10000
+  min_description_length: 0
+  max_job_age_days: 0
 telegram:
   bot_token: ""
   chat_id: 0
+
+# AI config
+ai:
+  enable: true
+  base_url:  "https://api.groq.com/openai/v1"
+  model: "openai/gpt-oss-120b"
+  api_token: ""
+  max_tokens: 8192
+  batch_size: 3
+
+# User CV Params
+profile:
+  name: ""
+  job_title: ""
+  contact:
+    email: ""
+    phone: ""
+    linkedin: ""
+    github: ""
+  summary: ""
+  skills:
+    - ""
+  languages:
+    - language: ""
+      level: ""
+
+  education:
+    - course: ""
+      institution: ""
+      period: ""
+
+  experience:
+    - role: ""
+      company: ""
+      period: ""
+      description:
+        - ""
+        - ""
+
+  projects:
+    - name: ""
+      link: ""
+      description: ""
+
+    - name: ""
+      link: ""
+      description: ""
+
+    - name: ""
+      link: ""
+      description: ""

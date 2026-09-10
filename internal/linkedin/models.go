@@ -10,6 +10,7 @@ type Job struct {
 	Location       string
 	URL            string
 	PostedDate     string
+	PostedAt       time.Time
 	Description    string
 	SeniorityLevel string
 	EmploymentType string

@@ -3,6 +3,7 @@ package filter
 import (
 	"regexp"
 	"strings"
+	"time"
 
 	"github.com/JonasFranc1sco/vagouBot/internal/linkedin"
 )
@@ -16,6 +17,7 @@ type Config struct {
 	IncludeLocations     []string
 	ExcludeLocations     []string
 	MinDescriptionLength int
+	MaxJobAgeDays        int
 }
 
 func FilterProcess(jobs []linkedin.Job, cfg Config) []linkedin.Job {
@@ -83,6 +85,11 @@ func shouldKeep(job linkedin.Job, cfg Config) bool {
 	}
 
 	if cfg.MinDescriptionLength > 0 && len(job.Description) < cfg.MinDescriptionLength {
+		return false
+	}
+
+	if cfg.MaxJobAgeDays > 0 && !job.PostedAt.IsZero() &&
+		int(time.Since(job.PostedAt).Hours()/24) > cfg.MaxJobAgeDays {
 		return false
 	}
 

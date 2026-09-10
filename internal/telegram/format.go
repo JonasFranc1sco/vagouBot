@@ -2,10 +2,93 @@ package telegram
 
 import (
 	"fmt"
+	"net/url"
+	"regexp"
 	"strings"
 
 	"github.com/JonasFranc1sco/vagouBot/internal/linkedin"
 )
+
+// jobURLRe casa a URL de uma vaga do LinkedIn dentro do texto da mensagem.
+var jobURLRe = regexp.MustCompile(`https?://[^\s"<>]+linkedin\.com/jobs/view/[^\s"<>/?#]*\d+`)
+
+// JobIDFromMessage extrai o ID da vaga de uma mensagem de notificação.
+// Prioriza a entidade "text_link" (onde o Telegram guarda a URL quando a
+// mensagem foi enviada com parse_mode=HTML); se não achar, tenta a entidade
+// "url" recortando o texto e, por último, cai no fallback por regex no texto.
+func JobIDFromMessage(msg *Message) string {
+	if msg == nil {
+		return ""
+	}
+
+	// 1) Entidade text_link: a URL vem completa e limpa no campo URL.
+	for _, e := range msg.Entities {
+		if e.Type == "text_link" && e.URL != "" {
+			if id := JobIDFromURL(e.URL); id != "" {
+				return id
+			}
+		}
+	}
+
+	// 2) Entidade url: a URL aparece solta no texto — recorta pelo offset.
+	for _, e := range msg.Entities {
+		if e.Type == "url" && e.Offset >= 0 && e.Length > 0 && e.Offset+e.Length <= len(msg.Text) {
+			if id := JobIDFromURL(msg.Text[e.Offset : e.Offset+e.Length]); id != "" {
+				return id
+			}
+		}
+	}
+
+	// 3) Fallback: procura a URL diretamente no texto.
+	return ExtractJobID(msg.Text)
+}
+
+// JobIDFromURL extrai o ID numérico da vaga a partir de uma URL do LinkedIn.
+// Aceita URLs numéricas (.../jobs/view/4371654421) e com slug
+// (.../jobs/view/python-developer-at-iris-software-inc-4464493957).
+func JobIDFromURL(rawURL string) string {
+	if rawURL == "" || !jobURLRe.MatchString(rawURL) {
+		return ""
+	}
+
+	u, err := url.Parse(rawURL)
+	if err != nil {
+		return ""
+	}
+
+	// Último segmento do path (o ID fica sempre no final).
+	path := strings.TrimRight(u.Path, "/")
+	parts := strings.Split(path, "/")
+	if len(parts) == 0 {
+		return ""
+	}
+	last := parts[len(parts)-1]
+
+	// Em URLs com slug, o ID é o último token separado por "-".
+	segments := strings.Split(last, "-")
+	id := segments[len(segments)-1]
+
+	// Garante que o que sobrou é só o ID numérico.
+	if id == "" {
+		return ""
+	}
+	for _, r := range id {
+		if r < '0' || r > '9' {
+			return ""
+		}
+	}
+	return id
+}
+
+// ExtractJobID extrai o ID numérico da vaga a partir do texto de uma
+// notificação do Telegram (a mensagem que o usuário respondeu com /resume).
+func ExtractJobID(text string) string {
+	m := jobURLRe.FindString(text)
+	if m == "" {
+		return ""
+	}
+	return JobIDFromURL(m)
+}
 
 // FormatJobNotification formata uma vaga em HTML para o Telegram
 func FormatJobNotification(job linkedin.Job) string {

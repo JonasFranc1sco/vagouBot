@@ -62,7 +62,15 @@ func parseJobCard(s *goquery.Selection) Job {
 
 	link, _ := s.Find("a.base-card__full-link, a[href*='/jobs/view/']").Attr("href")
 
-	postedDate := strings.TrimSpace(s.Find("time.job-search-card__listdate").Text())
+	postedSel := s.Find("time[class*='job-search-card__listdate']")
+	postedDate := strings.TrimSpace(postedSel.Text())
+	postedAt := time.Time{}
+	if datetime, ok := postedSel.Attr("datetime"); ok {
+		postedAt = parseAbsoluteDate(datetime)
+	}
+	if postedAt.IsZero() {
+		postedAt, _ = parsePostedDate(postedDate, time.Now())
+	}
 
 	description := strings.TrimSpace(s.Find(".artdeco-entity-snippet__subtitle-link, .search-entity-description").Text())
 
@@ -75,6 +83,7 @@ func parseJobCard(s *goquery.Selection) Job {
 		Location:    location,
 		URL:         link,
 		PostedDate:  postedDate,
+		PostedAt:    postedAt,
 		Description: description,
 		ScrapedAt:   time.Now(),
 	}

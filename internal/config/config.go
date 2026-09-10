@@ -14,6 +14,8 @@ type Config struct {
 	Telegram  TelegramConfig  `yaml:"telegram"`
 	RateLimit RateLimitConfig `yaml:"rate_limit"`
 	Filters   FiltersConfig   `yaml:"filters"`
+	Ai        AiConfig        `yaml:"ai"`
+	Profile   ProfileConfig   `yaml:"profile"`
 }
 
 type FiltersConfig struct {
@@ -24,6 +26,7 @@ type FiltersConfig struct {
 	IncludeLocations     []string `yaml:"include_locations"`
 	ExcludeLocations     []string `yaml:"exclude_locations"`
 	MinDescriptionLength int      `yaml:"min_description_length"`
+	MaxJobAgeDays        int      `yaml:"max_job_age_days"`
 }
 
 type LinkedInConfig struct {
@@ -35,6 +38,9 @@ type LinkedInConfig struct {
 
 	// Limite de vagas por busca
 	MaxResults int `yaml:"max_results"`
+
+	// Filtro de data de postagem (f_TPR): "", "day", "week" ou "month"
+	PostTime string `yaml:"post_time"`
 }
 
 type ProxyConfig struct {
@@ -51,6 +57,68 @@ type TelegramConfig struct {
 
 	// ID do chat/usuário para enviar mensagens
 	ChatID int64 `yaml:"chat_id"`
+}
+
+type AiConfig struct {
+	// Liga/desliga geração de currículo
+	Enable bool `yaml:"enable"`
+
+	// Endpoint OpenAI-compatible
+	BaseURL string `yaml:"base_url"`
+
+	// Nome do modelo
+	Model string `yaml:"model"`
+
+	// Chave da API
+	APIToken string `yaml:"api_token"`
+
+	MaxTokens int `yaml:"max_tokens"`
+
+	// Quantas vagas entraram na chamada
+	BatchSize int `yaml:"batch_size"`
+}
+
+type ProfileConfig struct {
+	Name       string             `yaml:"name"`
+	JobTitle   string             `yaml:"job_title"`
+	Contact    ContactConfig      `yaml:"contact"`
+	Summary    string             `yaml:"summary"`
+	Skills     []string           `yaml:"skills"`
+	Languages  []LanguageConfig   `yaml:"languages"`
+	Education  []EducationConfig  `yaml:"education"`
+	Experience []ExperienceConfig `yaml:"experience"`
+	Projects   []ProjectConfig    `yaml:"projects"`
+}
+
+type ContactConfig struct {
+	Email    string `yaml:"email"`
+	Phone    string `yaml:"phone"`
+	LinkedIn string `yaml:"linkedin"`
+	GitHub   string `yaml:"github"`
+}
+
+type LanguageConfig struct {
+	Language string `yaml:"language"`
+	Level    string `yaml:"level"`
+}
+
+type EducationConfig struct {
+	Course      string `yaml:"course"`
+	Institution string `yaml:"institution"`
+	Period      string `yaml:"period"`
+}
+
+type ExperienceConfig struct {
+	Role        string   `yaml:"role"`
+	Company     string   `yaml:"company"`
+	Period      string   `yaml:"period"`
+	Description []string `yaml:"description"`
+}
+
+type ProjectConfig struct {
+	Name        string `yaml:"name"`
+	Link        string `yaml:"link"`
+	Description string `yaml:"description"`
 }
 
 type RateLimitConfig struct {
@@ -88,10 +156,18 @@ func defaultConfig() *Config {
 			Keywords:   []string{"golang"},
 			Location:   "brazil",
 			MaxResults: 100,
+			PostTime:   "week",
 		},
 		RateLimit: RateLimitConfig{
 			RequestsPerSecond: 0.5,
 			Burst:             1,
+		},
+		Ai: AiConfig{
+			Enable:    false,
+			BaseURL:   "https://api.openai.com/v1",
+			Model:     "gpt-4o-mini",
+			MaxTokens: 2048,
+			BatchSize: 5,
 		},
 	}
 }
