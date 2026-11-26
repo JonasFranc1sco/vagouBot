@@ -74,19 +74,54 @@ func parseJobCard(s *goquery.Selection) Job {
 
 	description := strings.TrimSpace(s.Find(".artdeco-entity-snippet__subtitle-link, .search-entity-description").Text())
 
-	jobID := extractJobID(link)
+	jobID := extractURNJobID(s)
+	if jobID == "" {
+		jobID = extractJobID(link)
+	}
+
+	cleanURL := cleanJobURL(link, jobID)
 
 	return Job{
 		ID:          jobID,
 		Title:       title,
 		Company:     company,
 		Location:    location,
-		URL:         link,
+		URL:         cleanURL,
 		PostedDate:  postedDate,
 		PostedAt:    postedAt,
 		Description: description,
 		ScrapedAt:   time.Now(),
 	}
+}
+
+// extractURNJobID extrai o ID numérico diretamente do atributo data-entity-urn="urn:li:jobPosting:12345"
+func extractURNJobID(s *goquery.Selection) string {
+	urn, ok := s.Attr("data-entity-urn")
+	if !ok || urn == "" {
+		urn, _ = s.Find("[data-entity-urn]").First().Attr("data-entity-urn")
+	}
+	if urn == "" {
+		return ""
+	}
+	parts := strings.Split(urn, ":")
+	id := strings.TrimSpace(parts[len(parts)-1])
+	for _, r := range id {
+		if r < '0' || r > '9' {
+			return ""
+		}
+	}
+	return id
+}
+
+func cleanJobURL(rawURL, jobID string) string {
+	rawURL = strings.TrimSpace(rawURL)
+	if idx := strings.Index(rawURL, "?"); idx != -1 {
+		rawURL = rawURL[:idx]
+	}
+	if rawURL == "" && jobID != "" {
+		return "https://www.linkedin.com/jobs/view/" + jobID
+	}
+	return rawURL
 }
 
 // extractJobID pega o ID numérico da vaga a partir da URL
@@ -129,9 +164,7 @@ func (c *Client) FetchDetail(ctx context.Context, job *Job) error {
 		detailID = detailID[:idx]
 	}
 
-	detailURL := fmt.Sprintf("http://www.linkedin.com/jobs-guest/jobs/api/jobPosting/%s", detailID)
-
-	fmt.Printf("URL detalhe: %s\n", detailID)
+	detailURL := fmt.Sprintf("https://www.linkedin.com/jobs-guest/jobs/api/jobPosting/%s", detailID)
 
 	resp, err := c.DoRequest(ctx, detailURL)
 	if err != nil {
@@ -153,22 +186,32 @@ func (c *Client) FetchDetail(ctx context.Context, job *Job) error {
 		return fmt.Errorf("erro ao parsear detalhe: %w", err)
 	}
 
-	// Descrição completa
-	job.Description = strings.TrimSpace(doc.Find(".description__text--rich").Text())
+	if job.Title == "" {
+		job.Title = strings.TrimSpace(doc.Find(".top-card-layout__title, h2.top-card-layout__title").First().Text())
+	}
+	if job.Company == "" {
+		job.Company = strings.TrimSpace(doc.Find(".topcard__org-name-link, .topcard__flavor").First().Text())
+	}
+	if job.Location == "" {
+		job.Location = strings.TrimSpace(doc.Find(".topcard__flavor--bullet").First().Text())
+	}
 
-	// Critérios
+	// Descrição completa
+	job.Description = strings.TrimSpace(doc.Find(".description__text--rich, .show-more-less-html__markup").First().Text())
+
+	// Critérios (suporta labels em inglês e português)
 	doc.Find(".description__job-criteria-item").Each(func(i int, s *goquery.Selection) {
 		criteria := strings.TrimSpace(s.Find(".description__job-criteria-subheader").Text())
 		value := strings.TrimSpace(s.Find(".description__job-criteria-text").Text())
 
 		switch strings.ToLower(criteria) {
-		case "seniority level":
+		case "seniority level", "nível de experiência", "nivel de experiencia":
 			job.SeniorityLevel = value
-		case "employment type":
+		case "employment type", "tipo de emprego":
 			job.EmploymentType = value
-		case "job function":
+		case "job function", "função", "funcao":
 			job.JobFunction = value
-		case "industries":
+		case "industries", "setores":
 			job.Industries = value
 		}
 	})

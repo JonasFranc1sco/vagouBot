@@ -19,10 +19,15 @@ type Job struct {
 	ScrapedAt      time.Time
 }
 
-// SearchParams define parâmetros de busca.
+// SearchParams define parâmetros estruturados de busca no LinkedIn.
 type SearchParams struct {
-	Keywords   string
-	Location   string
-	Start      int
-	MaxResults int
+	Keywords         string
+	Location         string
+	GeoID            string
+	WorkplaceTypes   []string
+	ExperienceLevels []string
+	PostTime         string
+	SortBy           string
+	Start            int
+	MaxResults       int
 }
