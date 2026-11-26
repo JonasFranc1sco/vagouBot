@@ -31,6 +31,76 @@ func FilterProcess(jobs []linkedin.Job, cfg Config) []linkedin.Job {
 	return result
 }
 
+// PreFilterProcess aplica os filtros rápidos (título, empresa, localização e idade)
+// usando apenas os dados do card da busca, antes de realizar requisições de FetchDetail.
+func PreFilterProcess(jobs []linkedin.Job, cfg Config) []linkedin.Job {
+	var result []linkedin.Job
+
+	for _, job := range jobs {
+		if shouldKeepCard(job, cfg) {
+			result = append(result, job)
+		}
+	}
+	return result
+}
+
+func shouldKeepCard(job linkedin.Job, cfg Config) bool {
+	titleLower := strings.ToLower(job.Title)
+	companyLower := strings.ToLower(job.Company)
+	locationLower := strings.ToLower(job.Location)
+
+	for _, kw := range cfg.ExcludeKeywords {
+		if kw != "" && strings.Contains(titleLower, strings.ToLower(kw)) {
+			return false
+		}
+	}
+
+	for _, comp := range cfg.ExcludeCompanies {
+		if comp != "" && strings.Contains(companyLower, strings.ToLower(comp)) {
+			return false
+		}
+	}
+
+	for _, loc := range cfg.ExcludeLocations {
+		if loc != "" && strings.Contains(locationLower, strings.ToLower(loc)) {
+			return false
+		}
+	}
+
+	if len(cfg.IncludeCompanies) > 0 && companyLower != "" {
+		matched := false
+		for _, comp := range cfg.IncludeCompanies {
+			if comp != "" && strings.Contains(companyLower, strings.ToLower(comp)) {
+				matched = true
+				break
+			}
+		}
+		if !matched {
+			return false
+		}
+	}
+
+	if len(cfg.IncludeLocations) > 0 && locationLower != "" {
+		matched := false
+		for _, loc := range cfg.IncludeLocations {
+			if loc != "" && strings.Contains(locationLower, strings.ToLower(loc)) {
+				matched = true
+				break
+			}
+		}
+		if !matched {
+			return false
+		}
+	}
+
+	if cfg.MaxJobAgeDays > 0 && !job.PostedAt.IsZero() &&
+		int(time.Since(job.PostedAt).Hours()/24) > cfg.MaxJobAgeDays {
+		return false
+	}
+
+	return true
+}
+
 // shouldKeep verifica se uma vaga passa em todos os filtros.
 func shouldKeep(job linkedin.Job, cfg Config) bool {
 	titleLower := strings.ToLower(job.Title)
@@ -41,45 +111,55 @@ func shouldKeep(job linkedin.Job, cfg Config) bool {
 	combined := titleLower + " " + descLower
 
 	for _, kw := range cfg.ExcludeKeywords {
-		if strings.Contains(combined, strings.ToLower(kw)) {
+		if kw != "" && strings.Contains(combined, strings.ToLower(kw)) {
 			return false
 		}
 	}
 
 	for _, comp := range cfg.ExcludeCompanies {
-		if strings.Contains(companyLower, strings.ToLower(comp)) {
+		if comp != "" && strings.Contains(companyLower, strings.ToLower(comp)) {
 			return false
 		}
 	}
 
 	for _, loc := range cfg.ExcludeLocations {
-		if strings.Contains(locationLower, strings.ToLower(loc)) {
+		if loc != "" && strings.Contains(locationLower, strings.ToLower(loc)) {
 			return false
 		}
 	}
 
 	if len(cfg.IncludeCompanies) > 0 {
 		matched := false
+		hasNonEmpty := false
 		for _, comp := range cfg.IncludeCompanies {
+			if comp == "" {
+				continue
+			}
+			hasNonEmpty = true
 			if strings.Contains(companyLower, strings.ToLower(comp)) {
 				matched = true
 				break
 			}
 		}
-		if !matched {
+		if hasNonEmpty && !matched {
 			return false
 		}
 	}
 
 	if len(cfg.IncludeLocations) > 0 {
 		matched := false
+		hasNonEmpty := false
 		for _, loc := range cfg.IncludeLocations {
+			if loc == "" {
+				continue
+			}
+			hasNonEmpty = true
 			if strings.Contains(locationLower, strings.ToLower(loc)) {
 				matched = true
 				break
 			}
 		}
-		if !matched {
+		if hasNonEmpty && !matched {
 			return false
 		}
 	}
