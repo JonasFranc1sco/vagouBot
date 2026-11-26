@@ -8,5 +8,8 @@ services:
       - TZ=America/Sao_Paulo
       - TELEGRAM_BOT_TOKEN=${TELEGRAM_BOT_TOKEN:-}
       - TELEGRAM_CHAT_ID=${TELEGRAM_CHAT_ID:-0}
+      - LINKEDIN_LI_AT=${LINKEDIN_LI_AT:-}
+      - LINKEDIN_JSESSIONID=${LINKEDIN_JSESSIONID:-}
+      - AI_API_KEY=${AI_API_KEY:-}
     volumes:
     - ./data:/app/data

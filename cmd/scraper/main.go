@@ -3,9 +3,7 @@ package main
 import (
 	"context"
 	"fmt"
-	"io"
 	"log/slog"
-	"net/url"
 	"os"
 	"os/signal"
 	"path/filepath"
@@ -36,9 +34,6 @@ func main() {
 		logger.Error("carregar config", "err", err)
 		return
 	}
-	logger.Info("config carregada",
-		"keywords", strings.Join(cfg.LinkedIn.Keywords, ", "),
-		"location", cfg.LinkedIn.Location)
 
 	// Clientes compartilhados entre o scraper (diário) e o bot (interativo).
 	client := linkedin.NewClient(
@@ -46,6 +41,22 @@ func main() {
 		cfg.Proxy.Enabled,
 		cfg.RateLimit.RequestsPerSecond,
 		cfg.RateLimit.Burst,
+	)
+
+	liAt := env0r("LINKEDIN_LI_AT", cfg.LinkedIn.SessionCookie)
+	csrfToken := env0r("LINKEDIN_JSESSIONID", cfg.LinkedIn.CSRFToken)
+	if liAt != "" {
+		client.SetSession(liAt, csrfToken)
+	}
+
+	logger.Info("config carregada",
+		"keywords", strings.Join(cfg.LinkedIn.Keywords, ", "),
+		"location", cfg.LinkedIn.Location,
+		"geo_id", cfg.LinkedIn.GeoID,
+		"workplace_type", strings.Join(cfg.LinkedIn.WorkplaceType, ","),
+		"experience_level", strings.Join(cfg.LinkedIn.ExperienceLevel, ","),
+		"authenticated", client.HasSession(),
+		"fetch_recommended", cfg.LinkedIn.FetchRecommended,
 	)
 
 	tgToken := env0r("TELEGRAM_BOT_TOKEN", cfg.Telegram.BotToken)
@@ -124,44 +135,75 @@ func run(ctx context.Context, logger *slog.Logger, cfg *config.Config, client *l
 
 	var candidates []linkedin.Job
 
+	// 1. Vagas recomendadas diretamente para o perfil do usuário (se autenticado com li_at)
+	if cfg.LinkedIn.FetchRecommended && client.HasSession() {
+		recJobs, err := client.FetchRecommendedJobs(ctx, cfg.LinkedIn.MaxResults)
+		if err != nil {
+			logger.Warn("falha ao buscar vagas recomendadas do perfil", "err", err)
+		} else {
+			logger.Info("vagas recomendadas do perfil coletadas", "encontradas", len(recJobs))
+			candidates = append(candidates, recJobs...)
+		}
+	}
+
+	// 2. Busca por queries estruturadas (Voyager autenticado com fallback Guest, ou Guest direto)
 	for _, kw := range cfg.LinkedIn.Keywords {
 		if ctx.Err() != nil {
 			logger.Info("kill switch ativado, interrompendo busca")
 			break
 		}
-		jobs, err := searchKeyword(ctx, client, kw, cfg.LinkedIn.Location, cfg.LinkedIn.MaxResults, fTPR(cfg.LinkedIn.PostTime))
+		params := linkedin.SearchParams{
+			Keywords:         kw,
+			Location:         cfg.LinkedIn.Location,
+			GeoID:            cfg.LinkedIn.GeoID,
+			WorkplaceTypes:   cfg.LinkedIn.WorkplaceType,
+			ExperienceLevels: cfg.LinkedIn.ExperienceLevel,
+			PostTime:         cfg.LinkedIn.PostTime,
+			SortBy:           cfg.LinkedIn.SortBy,
+			MaxResults:       cfg.LinkedIn.MaxResults,
+		}
+		jobs, err := client.SearchJobs(ctx, params)
 		if err != nil {
-			logger.Error("busca falhou", "keyowrd", kw, "encontradas", len(jobs))
+			logger.Error("busca falhou", "keyword", kw, "encontradas", len(jobs), "err", err)
 			continue
 		}
 		logger.Info("busca concluída", "keyword", kw, "encontradas", len(jobs))
 		candidates = append(candidates, jobs...)
 	}
 
+	// Remove vagas já vistas em execuções anteriores ou duplicadas no mesmo lote
 	candidates = dedup.FilterNew(candidates)
-	if len(candidates) > cfg.LinkedIn.MaxResults {
-		candidates = candidates[:cfg.LinkedIn.MaxResults]
-	}
 	logger.Info("após dedup", "novas", len(candidates))
 
-	for i := range candidates {
+	// Pré-filtro rápido pelos metadados do card (título, empresa, localização, data)
+	// antes de gastar requisições buscando detalhes de vagas que já seriam descartadas.
+	preFiltered := filter.PreFilterProcess(candidates, filterCfg)
+	markRejectedAsSeen(dedup, candidates, preFiltered)
+
+	if cfg.LinkedIn.MaxResults > 0 && len(preFiltered) > cfg.LinkedIn.MaxResults {
+		preFiltered = preFiltered[:cfg.LinkedIn.MaxResults]
+	}
+	logger.Info("após pré-filtro", "candidatas", len(preFiltered))
+
+	for i := range preFiltered {
 		select {
 		case <-ctx.Done():
 			logger.Info("kill switch ativado, encerrando")
 			return nil
 		default:
 		}
-		if candidates[i].ID == "" {
+		if preFiltered[i].ID == "" {
 			continue
 		}
-		if err := client.FetchDetail(ctx, &candidates[i]); err != nil {
-			logger.Error("falha no detalhe", "id", candidates[i].ID, "err", err)
+		if err := client.FetchDetail(ctx, &preFiltered[i]); err != nil {
+			logger.Error("falha no detalhe", "id", preFiltered[i].ID, "err", err)
 			continue
 		}
 	}
 
-	filtered := filter.FilterProcess(candidates, filterCfg)
-	logger.Info("vagas relevantes", "de", len(candidates), "relevantes", len(filtered))
+	filtered := filter.FilterProcess(preFiltered, filterCfg)
+	markRejectedAsSeen(dedup, preFiltered, filtered)
+	logger.Info("vagas relevantes", "de", len(preFiltered), "relevantes", len(filtered))
 
 	for i, job := range filtered {
 		if i >= 3 {
@@ -187,48 +229,29 @@ func run(ctx context.Context, logger *slog.Logger, cfg *config.Config, client *l
 				if err := tg.SendHTML(ctx, msg); err != nil {
 					return fmt.Errorf("telegram: %w", err)
 				}
-				dedup.MarkSeen(job.ID)
+				dedup.MarkSeenJob(job)
 				time.Sleep(1 * time.Second)
 			}
 		}
+	} else {
+		// Modo console: também marca as vagas processadas como vistas
+		dedup.MarkAll(filtered)
 	}
 	return nil
 }
 
-func searchKeyword(ctx context.Context, client *linkedin.Client, keywords, location string, maxResults int, fTPR string) ([]linkedin.Job, error) {
-	var allJobs []linkedin.Job
-
-	for start := 0; start < maxResults; start += 25 {
-		select {
-		case <-ctx.Done():
-			return allJobs, nil
-		default:
-		}
-
-		searchURL := fmt.Sprintf("https://www.linkedin.com/jobs-guest/jobs/api/seeMoreJobPostings/search?keywords=%s&location=%s&start=%d", url.QueryEscape(keywords), url.QueryEscape(location), start)
-		if fTPR != "" {
-			searchURL += "&f_TPR=" + fTPR
-		}
-		resp, err := client.DoRequest(ctx, searchURL)
-		if err != nil {
-			return nil, err
-		}
-		defer resp.Body.Close()
-		body, err := io.ReadAll(resp.Body)
-		if err != nil {
-			return nil, err
-		}
-
-		jobs, err := linkedin.ParseJobs(strings.NewReader(string(body)))
-		if err != nil {
-			return allJobs, err
-		}
-		allJobs = append(allJobs, jobs...)
-		if len(jobs) == 0 {
-			break
+// markRejectedAsSeen marca no seen.json as vagas que foram descartadas pelos filtros,
+// evitando que o scraper refaça FetchDetail das mesmas vagas descartadas todos os dias.
+func markRejectedAsSeen(dedup *filter.DedupManager, before, after []linkedin.Job) {
+	kept := make(map[string]bool, len(after))
+	for _, j := range after {
+		kept[j.ID] = true
+	}
+	for _, j := range before {
+		if !kept[j.ID] {
+			dedup.MarkSeenJob(j)
 		}
 	}
-	return allJobs, nil
 }
 
 func env0r(key, fallback string) string {
@@ -249,19 +272,4 @@ func envChatID(logger *slog.Logger, fallback int64) int64 {
 		return fallback
 	}
 	return id
-}
-
-// fTPR converte a configuração post_time no parâmetro f_TPR do LinkedIn.
-// "" = qualquer data; "day" = últimas 24h; "week" = última semana; "month" = último mês.
-func fTPR(postTime string) string {
-	switch strings.ToLower(strings.TrimSpace(postTime)) {
-	case "day":
-		return "r86400"
-	case "week":
-		return "r604800"
-	case "month":
-		return "r2592000"
-	default:
-		return ""
-	}
 }

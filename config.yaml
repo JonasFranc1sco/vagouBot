@@ -1,10 +1,21 @@
 linkedin:
   keywords:
-    - "python"
-    - "junior"
-  location: "remote"
-  max_results: 10
+    - "Junior Python Developer"
+    - "Desenvolvedor Python Junior"
+    - "Junior Backend Developer"
+  location: "Brazil"
+  geo_id: "106057199"
+  workplace_type:
+    - "remote"
+  experience_level:
+    - "internship"
+    - "entry_level"
+  sort_by: "R"
+  max_results: 25
   post_time: "week"
+  fetch_recommended: true
+  session_cookie: ""
+  csrf_token: ""
 
 proxy:
   enabled: false
@@ -15,14 +26,34 @@ rate_limit:
   burst: 1
 
 filters:
-  include_keywords:
+  include_keywords: []
   exclude_keywords:
+    - "senior"
+    - "sênior"
+    - "sr."
+    - "pleno"
+    - "tech lead"
+    - "staff"
+    - "principal"
   exclude_companies: []
   include_companies: []
-  include_locations: []
-  exclude_locations: []
+  include_locations:
+    - "brazil"
+    - "brasil"
+    - "são paulo"
+    - "sao paulo"
+    - "remoto"
+    - "remote"
+    - "latam"
+  exclude_locations:
+    - "united states"
+    - "estados unidos"
+    - "india"
+    - "europe"
+    - "uk"
+    - "canada"
   min_description_length: 0
-  max_job_age_days: 0
+  max_job_age_days: 7
 telegram:
   bot_token: ""
   chat_id: 0

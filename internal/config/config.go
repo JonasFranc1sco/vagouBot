@@ -30,17 +30,38 @@ type FiltersConfig struct {
 }
 
 type LinkedInConfig struct {
-	// Termos de busca (ex: "golang", "backend senior")
+	// Termos de busca (ex: "Junior Python Developer", "Backend Junior")
 	Keywords []string `yaml:"keywords"`
 
-	// Onde buscar as vagas
+	// Onde buscar as vagas (ex: "Brazil")
 	Location string `yaml:"location"`
+
+	// GeoID do LinkedIn (ex: "106057199" para Brasil)
+	GeoID string `yaml:"geo_id"`
+
+	// Modalidade de trabalho (f_WT): "remote", "hybrid", "onsite"
+	WorkplaceType []string `yaml:"workplace_type"`
+
+	// Nível de experiência (f_E): "internship", "entry_level", "associate", "mid_senior", "director", "executive"
+	ExperienceLevel []string `yaml:"experience_level"`
+
+	// Ordenação: "R" (relevância) ou "DD" (mais recentes)
+	SortBy string `yaml:"sort_by"`
 
 	// Limite de vagas por busca
 	MaxResults int `yaml:"max_results"`
 
 	// Filtro de data de postagem (f_TPR): "", "day", "week" ou "month"
 	PostTime string `yaml:"post_time"`
+
+	// Cookie de sessão li_at (opcional, também lido de LINKEDIN_LI_AT)
+	SessionCookie string `yaml:"session_cookie"`
+
+	// Token CSRF / JSESSIONID (opcional, também lido de LINKEDIN_JSESSIONID)
+	CSRFToken string `yaml:"csrf_token"`
+
+	// Busca vagas recomendadas para o perfil logado (requer session_cookie / LINKEDIN_LI_AT)
+	FetchRecommended bool `yaml:"fetch_recommended"`
 }
 
 type ProxyConfig struct {
